@@ -1,8 +1,8 @@
+
 import React, { useState } from 'react';
 import { Family, Member, Role, User, AppRole } from '../types';
 import { Button } from './Button';
-import { ArrowLeft, Mail, Phone, MapPin, Sparkles, Smartphone, Trash2, Edit, Calendar, UserCheck, XCircle } from 'lucide-react';
-import { generateFamilyInsights } from '../services/geminiService';
+import { ArrowLeft, Mail, Phone, MapPin, Smartphone, Trash2, Edit, Calendar, UserCheck, XCircle, Info } from 'lucide-react';
 import { saveFamily, deleteFamily } from '../services/storageService';
 import { MembershipCard } from './MembershipCard';
 
@@ -42,23 +42,18 @@ const DefaultUserIcon = ({ size = 40 }: { size?: number }) => (
   </svg>
 );
 
-export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUser, onBack, onEdit, onUpdate }) => {
-  const [loadingAi, setLoadingAi] = useState(false);
-  const isAdmin = currentUser.role === AppRole.ADMIN;
-
-  const handleGenerateAi = async () => {
-    setLoadingAi(true);
-    const summary = await generateFamilyInsights(family);
-    const updated = { ...family, aiSummary: summary };
-    saveFamily(updated);
-    onUpdate(updated);
-    setLoadingAi(false);
-  };
+export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUser, onBack, onEdit, onUpdate, onDelete }) => {
+  const isAdmin = currentUser.role === AppRole.ADMIN || currentUser.role === AppRole.SUPERADMIN;
 
   const handleDelete = () => {
     if (window.confirm('ATENCIÓN: ¿Está seguro de que desea eliminar permanentemente esta familia y todos sus miembros? Esta acción no se puede deshacer.')) {
-      deleteFamily(family.id);
-      onBack();
+      if (onDelete) {
+        onDelete(family.id);
+      } else {
+        // Fallback
+        deleteFamily(family.id);
+        onBack();
+      }
     }
   };
 
@@ -67,6 +62,14 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
      if (gender === 'M') return <ModernFemaleIcon size={48} />;
      return <DefaultUserIcon size={48} />;
   };
+
+  // Format creation date nicely
+  const formattedCreationDate = family.createdAt 
+    ? new Date(family.createdAt).toLocaleString('es-ES', { 
+        day: '2-digit', month: '2-digit', year: 'numeric', 
+        hour: '2-digit', minute: '2-digit' 
+      })
+    : 'Desconocida';
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -78,25 +81,25 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
       */}
       <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative group">
         
-        {/* Banner with Pattern */}
-        <div className="h-40 bg-red-700 relative overflow-hidden">
+        {/* Banner with Pattern - Changed to Slate-100 (Very Light Grey) */}
+        <div className="h-40 bg-slate-100 relative overflow-hidden border-b border-slate-200">
            {/* Abstract Dot Pattern */}
-           <div className="absolute inset-0 opacity-20" 
+           <div className="absolute inset-0 opacity-40" 
                 style={{ 
-                  backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', 
+                  backgroundImage: 'radial-gradient(circle at 2px 2px, #cbd5e1 1px, transparent 0)', 
                   backgroundSize: '24px 24px' 
                 }}>
            </div>
            
-           {/* Gradient Overlay */}
-           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+           {/* Gradient Overlay for subtlety */}
+           <div className="absolute inset-0 bg-gradient-to-t from-white/60 to-transparent"></div>
 
-           {/* Top Actions - Only Admin can see Delete */}
+           {/* Top Actions - Only Admin/SuperAdmin can see Delete */}
            {isAdmin && (
              <div className="absolute top-4 right-4 flex gap-2 z-10">
                <button 
                   onClick={handleDelete}
-                  className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full backdrop-blur-md transition-all hover:scale-105 border border-white/20 shadow-sm"
+                  className="bg-white hover:bg-red-50 text-slate-400 hover:text-red-600 p-2 rounded-full transition-all hover:scale-105 border border-slate-200 shadow-sm"
                   title="Eliminar Familia"
                >
                  <Trash2 size={18} />
@@ -104,19 +107,19 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
              </div>
            )}
            
-           {/* Badges */}
+           {/* Badges - Adjusted colors for light background */}
            <div className="absolute top-4 left-4 flex gap-3 z-10">
-              <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-bold border border-white/10 shadow-sm">
-                <span className="opacity-70">SOCIO</span>
-                <span className="font-mono text-yellow-400 text-sm">#{family.membershipNumber}</span>
+              <div className="flex items-center gap-1.5 bg-white text-slate-600 px-3 py-1 rounded-full text-xs font-bold border border-slate-200 shadow-sm">
+                <span className="opacity-70 uppercase tracking-widest text-[10px]">Socio</span>
+                <span className="font-mono text-slate-900 text-sm">#{family.membershipNumber}</span>
               </div>
               
               {family.status === 'Activo' ? (
-                <div className="flex items-center gap-1.5 bg-green-500/90 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-green-200">
                    <UserCheck size={12} /> ACTIVO
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 bg-slate-500/90 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-slate-300">
                    <XCircle size={12} /> BAJA
                 </div>
               )}
@@ -266,63 +269,22 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
 
         {/* Right Column: Sidebar */}
         <div className="space-y-6">
-          
           {/* Membership Card Component */}
           <div className="bg-slate-50 p-1 rounded-2xl border border-slate-200">
              <MembershipCard family={family} />
           </div>
 
-          <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-xl border border-slate-800 relative overflow-hidden group">
-            {/* Abstract bg shape & animation */}
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-600/30 rounded-full blur-3xl group-hover:bg-red-600/40 transition-all duration-700"></div>
-            <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black to-transparent opacity-50"></div>
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-2.5 mb-5 text-yellow-400">
-                <div className="p-1.5 bg-yellow-400/10 rounded-lg">
-                  <Sparkles size={18} />
-                </div>
-                <h3 className="text-lg font-bold" style={{fontFamily: 'Montserrat, sans-serif'}}>Perfil Inteligente</h3>
-              </div>
-              
-              {family.aiSummary ? (
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="prose prose-invert prose-sm mb-5">
-                    <div className="whitespace-pre-line text-slate-300 leading-relaxed text-sm font-light">
-                      {family.aiSummary}
-                    </div>
-                  </div>
-                  {isAdmin && (
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="w-full bg-white/5 border-white/10 text-slate-200 hover:bg-white/10 hover:text-white hover:border-white/20 backdrop-blur-md"
-                      onClick={handleGenerateAi}
-                      disabled={loadingAi}
-                    >
-                      {loadingAi ? 'Actualizando...' : 'Regenerar Análisis'}
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-2">
-                  <p className="text-slate-400 text-sm mb-6 leading-relaxed">
-                    Utiliza nuestra IA para analizar la composición familiar y recibir sugerencias de actividades personalizadas.
-                  </p>
-                  {isAdmin && (
-                    <Button 
-                      variant="primary" 
-                      className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 border-none shadow-lg shadow-red-900/30 transform transition-transform active:scale-95"
-                      onClick={handleGenerateAi}
-                      disabled={loadingAi}
-                    >
-                      {loadingAi ? 'Analizando...' : 'Generar Análisis con IA'}
-                    </Button>
-                  )}
-                </div>
-              )}
+          {/* Creation Metadata (Discreet) */}
+          {(family.createdAt || family.createdBy) && (
+            <div className="px-4 py-3 rounded-xl border border-slate-100 bg-white shadow-sm flex items-start gap-3">
+               <Info className="text-slate-300 mt-0.5 shrink-0" size={16} />
+               <div className="text-xs text-slate-500">
+                  <p className="font-bold text-slate-600">Auditoría del Registro</p>
+                  <p>Creado el: {formattedCreationDate}</p>
+                  {family.createdBy && <p>Usuario: <span className="font-mono text-slate-600">{family.createdBy}</span></p>}
+               </div>
             </div>
-          </div>
+          )}
         </div>
 
       </div>

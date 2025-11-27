@@ -14,7 +14,11 @@
     "@google/genai": "^1.30.0",
     "react": "^19.2.0",
     "recharts": "^3.5.0",
-    "react-qr-code": "2.0.12"
+    "react-qr-code": "2.0.12",
+    "html2canvas": "1.4.1",
+    "jspdf": "2.5.1",
+    "jszip": "3.10.1",
+    "file-saver": "2.0.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

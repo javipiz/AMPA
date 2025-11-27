@@ -1,26 +1,25 @@
+
 import { AppRole, User } from "../types";
 import { getUsers } from "./storageService";
 
-export const login = (username: string, password: string): Promise<User> => {
-  return new Promise((resolve, reject) => {
-    // Simulate network delay for better UX
-    setTimeout(() => {
-      const users = getUsers();
-      const user = users.find((u: any) => u.username === username && u.password === password);
-      
-      if (user) {
-        // Return user without password
-        const { password, ...safeUser } = user;
-        resolve(safeUser);
-      } else {
-        reject(new Error('Credenciales incorrectas'));
-      }
-    }, 800);
-  });
+export const login = async (username: string, password: string): Promise<User> => {
+  // Ahora getUsers es asíncrono y consulta al servidor
+  try {
+    const users = await getUsers();
+    const user = users.find((u: any) => u.username === username && u.password === password);
+    
+    if (user) {
+      const { password, ...safeUser } = user;
+      return safeUser;
+    } else {
+      throw new Error('Credenciales incorrectas');
+    }
+  } catch (error) {
+    throw error;
+  }
 };
 
 export const logout = (): void => {
-  // Clear any session storage if implemented later
   localStorage.removeItem('ampa_session_user');
 };
 

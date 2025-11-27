@@ -1,121 +1,170 @@
+
 import { Family, FamilyStatus, Role, User, AppRole } from '../types';
 
-const STORAGE_KEY = 'familias_data_v2';
-const USERS_STORAGE_KEY = 'ampa_users_v1';
+const API_URL = 'http://localhost:3001/api';
 
-// Initial Mock Data to populate the app if empty
-const MOCK_DATA: Family[] = [
-  {
-    id: 'fam_1',
-    membershipNumber: '001',
-    familyName: 'Familia García López',
-    address: 'Calle Mayor 123, Madrid',
-    phone: '910000000',
-    email: 'familia.garcia@email.com',
-    joinDate: '2023-01-15',
-    status: FamilyStatus.ACTIVE,
-    members: [
-      { id: 'm_1', firstName: 'Juan', lastName: 'García', birthDate: '1980-05-12', role: Role.FATHER, gender: 'H', email: 'juan.garcia@work.com', phone: '600111222' },
-      { id: 'm_2', firstName: 'María', lastName: 'López', birthDate: '1982-08-23', role: Role.MOTHER, gender: 'M', email: 'maria.lopez@personal.com', phone: '600333444' },
-      { id: 'm_3', firstName: 'Lucas', lastName: 'García', birthDate: '2010-02-10', role: Role.CHILD, gender: 'H' },
-      { id: 'm_4', firstName: 'Sofía', lastName: 'García', birthDate: '2012-11-05', role: Role.CHILD, gender: 'M' },
-      { id: 'm_5', firstName: 'Leo', lastName: 'García', birthDate: '2015-06-20', role: Role.CHILD, gender: 'H' }
-    ]
-  },
-  {
-    id: 'fam_2',
-    membershipNumber: '002',
-    familyName: 'Familia Ruiz Martínez',
-    address: 'Av. Constitución 45, Valencia',
-    phone: '960000000',
-    email: 'ruiz.mtnez@email.com',
-    joinDate: '2023-03-10',
-    status: FamilyStatus.ACTIVE,
-    members: [
-      { id: 'm_7', firstName: 'Elena', lastName: 'Martínez', birthDate: '1981-04-15', role: Role.MOTHER, gender: 'M', email: 'elena.m@design.com' },
-      { id: 'm_8', firstName: 'Ana', lastName: 'Ruiz', birthDate: '2008-09-09', role: Role.CHILD, gender: 'M' },
-      { id: 'm_9', firstName: 'Pablo', lastName: 'Ruiz', birthDate: '2011-03-30', role: Role.CHILD, gender: 'H' }
-    ]
-  }
-];
+// --- HELPERS LOCAL STORAGE (FALLBACK) ---
+const LOCAL_STORAGE_FAMILIES_KEY = 'ampa_families_data';
+const LOCAL_STORAGE_USERS_KEY = 'ampa_users_data';
 
-// Initial Users
-const DEFAULT_USERS = [
-  {
-    username: 'admin',
-    password: 'Pimiento',
-    name: 'Administrador',
-    role: AppRole.ADMIN
-  },
-  {
-    username: 'usuario',
-    password: 'agustinos',
-    name: 'Usuario Lector',
-    role: AppRole.USER
-  }
-];
-
-export const getFamilies = (): Family[] => {
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (!data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DATA));
-    return MOCK_DATA;
-  }
-  return JSON.parse(data);
+const getLocalFamilies = (): Family[] => {
+  const data = localStorage.getItem(LOCAL_STORAGE_FAMILIES_KEY);
+  return data ? JSON.parse(data) : [];
 };
 
-export const saveFamily = (family: Family): void => {
-  const families = getFamilies();
-  const index = families.findIndex(f => f.id === family.id);
-  if (index >= 0) {
-    families[index] = family;
-  } else {
-    families.push(family);
-  }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(families));
+const saveLocalFamilies = (families: Family[]) => {
+  localStorage.setItem(LOCAL_STORAGE_FAMILIES_KEY, JSON.stringify(families));
 };
 
-export const deleteFamily = (id: string): void => {
-  const families = getFamilies();
-  const filtered = families.filter(f => f.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+const getLocalUsers = (): any[] => {
+  const data = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
+  if (data) return JSON.parse(data);
+  
+  // Usuarios por defecto si no existen
+  const defaults = [
+    { username: 'MPM', password: 'R2d2c3po', name: 'Super Administrador', role: 'SUPERADMIN' },
+    { username: 'admin', password: 'Pimiento', name: 'Administrador', role: 'ADMIN' },
+    { username: 'usuario', password: 'agustinos', name: 'Usuario Lector', role: 'USER' }
+  ];
+  localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(defaults));
+  return defaults;
+};
+
+const saveLocalUsers = (users: any[]) => {
+  localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
+};
+
+// --- FAMILIAS ---
+
+export const getFamilies = async (): Promise<Family[]> => {
+  try {
+    const response = await fetch(`${API_URL}/families`);
+    if (!response.ok) throw new Error('Server unavailable');
+    return await response.json();
+  } catch (error) {
+    console.warn("Servidor no disponible. Usando modo LocalStorage (Offline).");
+    return getLocalFamilies();
+  }
+};
+
+export const saveFamily = async (family: Family): Promise<Family> => {
+  try {
+    const response = await fetch(`${API_URL}/families`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(family)
+    });
+    if (!response.ok) throw new Error('Server error');
+    return await response.json();
+  } catch (error) {
+    console.warn("Servidor no disponible. Guardando en LocalStorage.");
+    const families = getLocalFamilies();
+    const index = families.findIndex(f => f.id === family.id);
+    if (index >= 0) {
+      families[index] = family;
+    } else {
+      families.push(family);
+    }
+    saveLocalFamilies(families);
+    return family;
+  }
+};
+
+export const deleteFamily = async (id: string): Promise<void> => {
+  try {
+    await fetch(`${API_URL}/families/${id}`, { method: 'DELETE' });
+  } catch (error) {
+    console.warn("Servidor no disponible. Eliminando de LocalStorage.");
+    const families = getLocalFamilies();
+    const filtered = families.filter(f => f.id !== id);
+    saveLocalFamilies(filtered);
+  }
 };
 
 export const generateId = (): string => {
   return Math.random().toString(36).substr(2, 9);
 };
 
-export const getNextMembershipNumber = (): string => {
-  const families = getFamilies();
-  if (families.length === 0) return '001';
-  const max = families.reduce((acc, curr) => Math.max(acc, parseInt(curr.membershipNumber || '0', 10)), 0);
-  return (max + 1).toString().padStart(3, '0');
-};
-
-// --- USER MANAGEMENT ---
-
-export const getUsers = (): any[] => {
-  const data = localStorage.getItem(USERS_STORAGE_KEY);
-  if (!data) {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
-    return DEFAULT_USERS;
+export const getNextMembershipNumber = async (): Promise<string> => {
+  try {
+    const response = await fetch(`${API_URL}/next-membership-number`);
+    if (!response.ok) throw new Error('Server error');
+    const data = await response.json();
+    return data.number;
+  } catch (error) {
+    // Lógica de cálculo local
+    const families = getLocalFamilies();
+    if (families.length === 0) return '001';
+    
+    const max = families.reduce((acc, curr) => {
+      const val = parseInt(curr.membershipNumber, 10);
+      const safeNum = isNaN(val) ? 0 : val;
+      return Math.max(acc, safeNum);
+    }, 0);
+    
+    return (max + 1).toString().padStart(3, '0');
   }
-  return JSON.parse(data);
 };
 
-export const saveUser = (user: any): void => {
-  const users = getUsers();
-  const index = users.findIndex(u => u.username === user.username);
-  if (index >= 0) {
-    users[index] = user; // Update existing (e.g. password change)
-  } else {
-    users.push(user); // Add new
+// --- USUARIOS ---
+
+export const getUsers = async (): Promise<any[]> => {
+  try {
+    const response = await fetch(`${API_URL}/users`);
+    if (!response.ok) throw new Error('Server error');
+    return await response.json();
+  } catch (error) {
+    console.warn("Servidor no disponible. Usando usuarios locales.");
+    return getLocalUsers();
   }
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
 };
 
-export const deleteUser = (username: string): void => {
-  const users = getUsers();
-  const filtered = users.filter(u => u.username !== username);
-  localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(filtered));
+export const saveUser = async (user: any): Promise<void> => {
+  try {
+    await fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user)
+    });
+  } catch (error) {
+    const users = getLocalUsers();
+    const index = users.findIndex(u => u.username === user.username);
+    if (index >= 0) {
+      users[index] = user;
+    } else {
+      users.push(user);
+    }
+    saveLocalUsers(users);
+  }
+};
+
+export const deleteUser = async (username: string): Promise<void> => {
+  try {
+    await fetch(`${API_URL}/users/${username}`, { method: 'DELETE' });
+  } catch (error) {
+    const users = getLocalUsers();
+    const filtered = users.filter(u => u.username !== username);
+    saveLocalUsers(filtered);
+  }
+};
+
+// --- HERRAMIENTAS DB ---
+
+export const importFamilies = async (families: Family[]): Promise<void> => {
+   try {
+    await fetch(`${API_URL}/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ families })
+    });
+   } catch (error) {
+     const current = getLocalFamilies();
+     // Fusión simple para modo local
+     families.forEach(f => {
+        const idx = current.findIndex(c => c.id === f.id);
+        if (idx >= 0) current[idx] = f;
+        else current.push(f);
+     });
+     saveLocalFamilies(current);
+   }
 };

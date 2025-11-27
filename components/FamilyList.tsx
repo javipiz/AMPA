@@ -1,7 +1,8 @@
+
 import React, { useState, useRef } from 'react';
-import { Family, FamilyStatus, Role, User, AppRole } from '../types';
+import { Family, FamilyStatus, Role, User, AppRole, Member } from '../types';
 import { Button } from './Button';
-import { Search, Users, MapPin, Download, Printer, FileSpreadsheet, LayoutGrid, List, Edit, Trash2, Eye, CheckCircle, Phone, Mail, User as UserIcon, X, ChevronDown, Filter, FileText, UserPlus } from 'lucide-react';
+import { Search, Users, MapPin, Download, Printer, FileSpreadsheet, LayoutGrid, List, Edit, Trash2, Eye, CheckCircle, Phone, Mail, User as UserIcon, X, ChevronDown, Filter, FileText, UserPlus, ChevronRight } from 'lucide-react';
 import { MembershipCard } from './MembershipCard';
 
 interface FamilyListProps {
@@ -19,7 +20,7 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
-  const isAdmin = currentUser.role === AppRole.ADMIN;
+  const isAdmin = currentUser.role === AppRole.ADMIN || currentUser.role === AppRole.SUPERADMIN;
 
   // --- Estados para Impresión Masiva ---
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -30,6 +31,21 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
     rangeEnd: ''
   });
   const [familiesToPrint, setFamiliesToPrint] = useState<Family[]>([]);
+
+  // Helper para ordenar miembros: Padres/Tutores primero, Hijos después
+  const sortMembers = (members: Member[]) => {
+    const rolePriority: Record<string, number> = {
+      [Role.FATHER]: 1,
+      [Role.MOTHER]: 1,
+      [Role.TUTOR]: 1,
+      [Role.CHILD]: 2
+    };
+    return [...members].sort((a, b) => {
+      const pA = rolePriority[a.role] || 99;
+      const pB = rolePriority[b.role] || 99;
+      return pA - pB;
+    });
+  };
 
   // Filtros principales
   const filteredFamilies = families.filter(f => {
@@ -82,11 +98,13 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
   };
 
   const handleExportExcelMembers = () => {
-    const headers = ['Nº Socio', 'Familia', 'Nombre', 'Apellidos', 'Rol', 'Sexo', 'Fecha Nacimiento', 'Teléfono Familia', 'Email Familia'];
+    // Unificar Teléfono y Email en una sola columna 'Contacto'
+    const headers = ['Nº Socio', 'Familia', 'Nombre', 'Apellidos', 'Rol', 'Sexo', 'Fecha Nacimiento', 'Contacto'];
     const rows: string[][] = [];
 
     sortedFamilies.forEach(f => {
-      f.members.forEach(m => {
+      const sortedMems = sortMembers(f.members);
+      sortedMems.forEach(m => {
         rows.push([
           f.membershipNumber,
           `"${f.familyName}"`,
@@ -95,8 +113,7 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
           m.role,
           m.gender || '-',
           m.birthDate,
-          f.phone,
-          f.email
+          `"${f.phone} | ${f.email}"` // Combined column
         ]);
       });
     });
@@ -108,14 +125,14 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
 
   // --- Lógica de Exportación PDF ---
   
-  const getPDFHeader = (title: string) => `
+  const getPDFHeader = (title: string, orientation: 'portrait' | 'landscape') => `
     <html>
       <head>
         <title>${title} - AMPA Agustinos</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
-          @page { size: A4 landscape; margin: 10mm; }
+          @page { size: A4 ${orientation}; margin: 10mm; }
           body { font-family: 'Montserrat', sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           tr { break-inside: avoid; }
         </style>
@@ -157,36 +174,38 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
     </html>
   `;
 
-  const handleExportPDFFamilies = () => {
+  const handleExportPDFFamilies = (orientation: 'portrait' | 'landscape') => {
     const printWindow = window.open('', '', 'width=1100,height=800');
     if (!printWindow) return;
 
+    // Si es vertical, mostramos menos datos o letra más pequeña si es necesario, 
+    // pero en este caso el contenido se adapta.
     const rowsHtml = sortedFamilies.map((f, index) => `
       <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}">
-        <td class="px-4 py-3 font-mono font-bold text-slate-600 border-b border-slate-200">#${f.membershipNumber}</td>
-        <td class="px-4 py-3 font-bold text-slate-800 border-b border-slate-200">${f.familyName}</td>
-        <td class="px-4 py-3 border-b border-slate-200">
-          <span class="px-2 py-1 rounded text-xs font-bold uppercase ${f.status === FamilyStatus.ACTIVE ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${f.status}</span>
+        <td class="px-3 py-3 font-mono font-bold text-slate-600 border-b border-slate-200 text-xs">#${f.membershipNumber}</td>
+        <td class="px-3 py-3 font-bold text-slate-800 border-b border-slate-200 text-sm">${f.familyName}</td>
+        <td class="px-3 py-3 border-b border-slate-200">
+          <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${f.status === FamilyStatus.ACTIVE ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${f.status}</span>
         </td>
-        <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">${f.address}</td>
-        <td class="px-4 py-3 text-sm font-mono text-slate-600 border-b border-slate-200 whitespace-nowrap">${f.phone}</td>
-        <td class="px-4 py-3 text-sm text-slate-600 border-b border-slate-200">${f.email}</td>
-        <td class="px-4 py-3 text-center text-sm font-bold text-slate-600 border-b border-slate-200">${f.members.filter(m => m.role === Role.CHILD).length}</td>
+        <td class="px-3 py-3 text-xs text-slate-600 border-b border-slate-200">${f.address}</td>
+        <td class="px-3 py-3 text-xs font-mono text-slate-600 border-b border-slate-200 whitespace-nowrap">${f.phone}</td>
+        <td class="px-3 py-3 text-xs text-slate-600 border-b border-slate-200 break-all">${f.email}</td>
+        <td class="px-3 py-3 text-center text-xs font-bold text-slate-600 border-b border-slate-200">${f.members.filter(m => m.role === Role.CHILD).length}</td>
       </tr>
     `).join('');
 
     printWindow.document.write(
-      getPDFHeader('Listado de Familias') + 
+      getPDFHeader('Listado de Familias', orientation) + 
       `<table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-800 text-white">
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider rounded-tl-lg">Socio</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Familia</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Estado</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Dirección</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Teléfono</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Email</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-center rounded-tr-lg">Hijos</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider rounded-tl-lg">Socio</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider">Familia</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider">Estado</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider">Dirección</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider">Teléfono</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider">Email</th>
+              <th class="px-3 py-3 text-[10px] font-bold uppercase tracking-wider text-center rounded-tr-lg">Hijos</th>
             </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
@@ -198,49 +217,77 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
   };
 
   const handleExportPDFMembers = () => {
+    // Listado de miembros detallado suele ser mejor en Horizontal por defecto
     const printWindow = window.open('', '', 'width=1100,height=800');
     if (!printWindow) return;
 
     let rowsHtml = '';
     
+    // Función para obtener colores según el rol
+    const getRoleStyles = (role: Role | string) => {
+        switch (role) {
+            case Role.FATHER:
+                return 'bg-blue-50/70 text-blue-900'; // Azul suave
+            case Role.MOTHER:
+                return 'bg-pink-50/70 text-pink-900'; // Rosa suave
+            case Role.TUTOR:
+                return 'bg-amber-50/70 text-amber-900'; // Ámbar suave
+            case Role.CHILD:
+                return 'bg-orange-50/40 text-orange-900'; // Naranja muy suave
+            default:
+                return 'bg-slate-50 text-slate-700';
+        }
+    };
+
     sortedFamilies.forEach((family, fIndex) => {
-        const members = family.members;
+        // Sort members: Parents/Tutors first, then Children
+        const members = sortMembers(family.members);
+        
         if (members.length === 0) return;
         
-        const bgClass = fIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+        const rowSeparatorClass = 'border-b border-slate-200';
         
         members.forEach((m, mIndex) => {
             const age = m.birthDate ? new Date().getFullYear() - new Date(m.birthDate).getFullYear() : '?';
             const isFirst = mIndex === 0;
+            const roleStyles = getRoleStyles(m.role);
             
-            rowsHtml += `<tr class="${bgClass}">`;
+            rowsHtml += `<tr class="bg-white">`;
             
             if (isFirst) {
                 // Family columns with rowspan
-                // TEXT SIZE UPDATE: Family is text-sm, Uppercase
                 rowsHtml += `
-                    <td rowspan="${members.length}" class="px-4 py-2 font-mono font-bold text-slate-600 border-b border-slate-200 text-xs align-top pt-3 border-r border-slate-100">#${family.membershipNumber}</td>
-                    <td rowspan="${members.length}" class="px-4 py-2 text-sm font-bold text-slate-800 uppercase border-b border-slate-200 align-top pt-3 border-r border-slate-100">${family.familyName}</td>
+                    <td rowspan="${members.length}" class="px-4 py-2 font-mono font-bold text-slate-600 ${rowSeparatorClass} text-xs align-top pt-3 border-r border-slate-100">#${family.membershipNumber}</td>
+                    <td rowspan="${members.length}" class="px-4 py-2 text-base font-black text-slate-800 uppercase ${rowSeparatorClass} align-top pt-3 border-r border-slate-100">${family.familyName}</td>
                 `;
             }
             
-            // Member columns
-            // TEXT SIZE UPDATE: Member is text-xs (Smaller than family)
+            // Member columns with specific color background for Role differentiation
             rowsHtml += `
-                <td class="px-4 py-2 text-xs text-slate-700 border-b border-slate-200">
-                    <div class="font-semibold">${m.lastName}, ${m.firstName}</div>
+                <td class="px-4 py-2 text-sm ${rowSeparatorClass} ${roleStyles} font-medium">
+                    ${m.lastName}, ${m.firstName}
                 </td>
-                <td class="px-4 py-2 border-b border-slate-200">
-                   <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${m.role === Role.CHILD ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}">${m.role}</span>
+                <td class="px-4 py-2 ${rowSeparatorClass} ${roleStyles}">
+                   <span class="text-[10px] font-bold uppercase tracking-wide">${m.role}</span>
                 </td>
-                 <td class="px-4 py-2 text-[10px] text-slate-500 border-b border-slate-200">
+                 <td class="px-4 py-2 text-[10px] text-slate-600 ${rowSeparatorClass} ${roleStyles}">
                    ${m.birthDate ? new Date(m.birthDate).toLocaleDateString() : '-'} ${m.role === Role.CHILD ? `(<b>${age} años</b>)` : ''}
                 </td>
             `;
 
             if (isFirst) {
+                 // Combined Contact Column
                  rowsHtml += `
-                    <td rowspan="${members.length}" class="px-4 py-2 text-xs font-mono text-slate-600 border-b border-slate-200 whitespace-nowrap align-top pt-3 border-l border-slate-100">${family.phone}</td>
+                    <td rowspan="${members.length}" class="px-4 py-2 ${rowSeparatorClass} align-top pt-3 border-l border-slate-100 bg-white">
+                       <div class="flex flex-col gap-1">
+                          <div class="font-mono text-xs font-bold text-slate-700 flex items-center gap-1">
+                             📞 ${family.phone}
+                          </div>
+                          <div class="text-[10px] text-blue-600 underline break-all font-medium leading-tight">
+                             ${family.email}
+                          </div>
+                       </div>
+                    </td>
                  `;
             }
             
@@ -249,7 +296,7 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
     });
 
     printWindow.document.write(
-      getPDFHeader('Listado de Miembros') + 
+      getPDFHeader('Listado Detallado de Miembros', 'landscape') + 
       `<table class="w-full text-left border-collapse">
           <thead>
             <tr class="bg-slate-800 text-white">
@@ -257,8 +304,8 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
               <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Familia</th>
               <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Apellidos, Nombre</th>
               <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Rol</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Nacimiento/Edad</th>
-              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider rounded-tr-lg">Teléfono</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider">Datos</th>
+              <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider rounded-tr-lg">Contacto</th>
             </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
@@ -438,44 +485,58 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
             Carnets
           </Button>
 
-          {/* Exportar */}
+          {/* Exportar - Nuevo Diseño Mejorado */}
           <div className="relative">
-             <Button variant="ghost" onClick={() => setShowExportMenu(!showExportMenu)} className={`w-auto px-4 gap-2 h-10 rounded-xl border transition-colors ${showExportMenu ? 'bg-slate-100 border-slate-300' : 'border-slate-200'}`}>
-                <Download size={18}/> <span className="hidden sm:inline">Exportar</span>
+             <Button 
+                variant="ghost" 
+                onClick={() => setShowExportMenu(!showExportMenu)} 
+                className={`w-auto px-4 gap-2 h-10 rounded-xl border transition-all ${showExportMenu ? 'bg-slate-800 text-white border-slate-800 shadow-lg' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}`}
+             >
+                <Download size={18}/> 
+                <span className="hidden sm:inline">Exportar</span>
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showExportMenu ? 'rotate-180' : ''}`}/>
              </Button>
              
              {showExportMenu && (
-               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+               <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 overflow-hidden origin-top-right animate-in fade-in zoom-in-95 duration-200 ring-1 ring-slate-900/5">
                  
-                 {/* Excel Section */}
-                 <div className="p-2 border-b border-slate-50 bg-slate-50/50">
-                    <p className="text-[10px] uppercase font-bold text-green-600 pl-2 flex items-center gap-1">
-                      <FileSpreadsheet size={10} /> Formato Excel (.csv)
-                    </p>
+                 {/* Header Excel */}
+                 <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center gap-2">
+                    <div className="p-1.5 bg-green-100 text-green-700 rounded-lg shadow-sm"><FileSpreadsheet size={14}/></div>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Excel (CSV)</span>
                  </div>
-                 <button onClick={handleExportExcelFamilies} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-3 transition-colors">
-                    <div className="w-1 h-1 bg-current rounded-full"></div>
-                    Por Familias
-                 </button>
-                 <button onClick={handleExportExcelMembers} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-green-50 hover:text-green-700 flex items-center gap-3 transition-colors">
-                    <div className="w-1 h-1 bg-current rounded-full"></div>
-                    Por Miembros
-                 </button>
+                 
+                 <div className="p-2 space-y-1">
+                    <button onClick={handleExportExcelFamilies} className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-between group transition-colors">
+                        <span>Listado de Familias</span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-green-600"/>
+                    </button>
+                    <button onClick={handleExportExcelMembers} className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-between group transition-colors">
+                        <span>Listado Detallado de Miembros</span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-green-600"/>
+                    </button>
+                 </div>
 
-                 {/* PDF Section */}
-                 <div className="p-2 border-b border-slate-50 bg-slate-50/50 border-t">
-                    <p className="text-[10px] uppercase font-bold text-red-600 pl-2 flex items-center gap-1">
-                      <FileText size={10} /> Formato PDF
-                    </p>
+                 {/* Header PDF */}
+                 <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100 border-t flex items-center gap-2">
+                    <div className="p-1.5 bg-red-100 text-red-700 rounded-lg shadow-sm"><FileText size={14}/></div>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Documentos PDF</span>
                  </div>
-                 <button onClick={handleExportPDFFamilies} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors">
-                    <div className="w-1 h-1 bg-current rounded-full"></div>
-                    Por Familias
-                 </button>
-                 <button onClick={handleExportPDFMembers} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-3 transition-colors">
-                    <div className="w-1 h-1 bg-current rounded-full"></div>
-                    Por Miembros
-                 </button>
+                 
+                 <div className="p-2 space-y-1 pb-3">
+                     <button onClick={() => handleExportPDFFamilies('landscape')} className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-between group transition-colors">
+                        <span>Resumen Familias (Horizontal)</span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-red-600"/>
+                    </button>
+                    <button onClick={() => handleExportPDFFamilies('portrait')} className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-between group transition-colors">
+                        <span>Resumen Familias (Vertical)</span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-red-600"/>
+                    </button>
+                    <button onClick={handleExportPDFMembers} className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center justify-between group transition-colors">
+                        <span>Listado Detallado de Miembros</span>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-red-600"/>
+                    </button>
+                 </div>
 
                </div>
              )}

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { login, setSessionUser } from '../services/authService';
 import { User } from '../types';
 import { Button } from './Button';
-import { Lock, User as UserIcon, AlertCircle, ArrowRight } from 'lucide-react';
+import { Lock, User as UserIcon, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: User) => void;
@@ -11,6 +11,7 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,7 +34,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Background Decoration */}
       <div className="absolute top-0 left-0 w-full h-1/2 bg-red-700 rounded-b-[30%] shadow-2xl z-0"></div>
-      <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 z-0 pointer-events-none"></div>
+      {/* Replaced external texture with CSS pattern to prevent load errors */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-10 z-0 pointer-events-none" 
+           style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+      </div>
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo Section */}
@@ -80,12 +84,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     <div className="relative">
                        <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={18} />
                        <input 
-                         type="password" 
+                         type={showPassword ? "text" : "password"}
                          value={password}
                          onChange={(e) => setPassword(e.target.value)}
-                         className="w-full pl-10 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 rounded-xl transition-all font-medium text-slate-800"
+                         className="w-full pl-10 pr-12 py-3 bg-slate-50 border-transparent focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/10 rounded-xl transition-all font-medium text-slate-800"
                          placeholder="••••••••"
                        />
+                       <button
+                         type="button"
+                         onClick={() => setShowPassword(!showPassword)}
+                         className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                         tabIndex={-1}
+                       >
+                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                       </button>
                     </div>
                  </div>
 
