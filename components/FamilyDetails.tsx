@@ -71,6 +71,24 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
       })
     : 'Desconocida';
 
+  // Sort Members: Adults first, then children by age (oldest first / birthDate ascending)
+  const sortedMembers = [...family.members].sort((a, b) => {
+      const isChildA = a.role === Role.CHILD;
+      const isChildB = b.role === Role.CHILD;
+
+      // Adults come first
+      if (!isChildA && isChildB) return -1;
+      if (isChildA && !isChildB) return 1;
+
+      // If both are children, sort by birthdate ascending (older first)
+      if (isChildA && isChildB) {
+          if (!a.birthDate) return 1;
+          if (!b.birthDate) return -1;
+          return a.birthDate.localeCompare(b.birthDate);
+      }
+      return 0;
+  });
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       
@@ -145,24 +163,24 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
                 {family.familyName}
               </h1>
               
-              {/* Contact Grid */}
+              {/* Contact Grid - REMOVED TRUNCATE */}
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6 text-sm text-slate-600">
                 <div className="flex items-center gap-2 group/item cursor-default">
-                  <div className="p-1.5 rounded-full bg-red-50 text-red-600 group-hover/item:bg-red-100 transition-colors">
+                  <div className="p-1.5 rounded-full bg-red-50 text-red-600 group-hover/item:bg-red-100 transition-colors shrink-0">
                     <MapPin size={14} />
                   </div>
-                  <span className="truncate font-medium">{family.address}</span>
+                  <span className="font-medium">{family.address}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 group/item cursor-default">
-                  <div className="p-1.5 rounded-full bg-blue-50 text-blue-600 group-hover/item:bg-blue-100 transition-colors">
+                  <div className="p-1.5 rounded-full bg-blue-50 text-blue-600 group-hover/item:bg-blue-100 transition-colors shrink-0">
                     <Mail size={14} />
                   </div>
-                  <span className="truncate font-medium">{family.email}</span>
+                  <span className="font-medium break-all">{family.email}</span>
                 </div>
 
                 <div className="flex items-center gap-2 group/item cursor-default">
-                  <div className="p-1.5 rounded-full bg-green-50 text-green-600 group-hover/item:bg-green-100 transition-colors">
+                  <div className="p-1.5 rounded-full bg-green-50 text-green-600 group-hover/item:bg-green-100 transition-colors shrink-0">
                     <Phone size={14} />
                   </div>
                   <span className="font-medium">{family.phone}</span>
@@ -211,7 +229,7 @@ export const FamilyDetails: React.FC<FamilyDetailsProps> = ({ family, currentUse
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-             {family.members.map((member) => (
+             {sortedMembers.map((member) => (
                <div key={member.id} className={`relative overflow-hidden flex flex-col p-5 rounded-2xl border transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${member.role === Role.CHILD ? 'bg-gradient-to-br from-orange-50 to-white border-orange-100' : 'bg-white border-slate-200'}`}>
                  
                  {/* Role Badge */}

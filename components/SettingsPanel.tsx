@@ -180,6 +180,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentUser }) => 
                 email: clean(cols[5]),
                 status: clean(cols[6]) as FamilyStatus,
                 joinDate: clean(cols[7]),
+                createdAt: new Date().toISOString(),
+                createdBy: `Importación CSV (${currentUser.username})`,
                 members: []
               });
            }

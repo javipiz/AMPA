@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Family, Role } from '../types';
 import { Button } from './Button';
-import { Printer, Mail, ShieldCheck, Download } from 'lucide-react';
+import { Printer, Mail, ShieldCheck, Download, Loader2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -100,37 +101,41 @@ Curso: ${schoolYear}`;
     }
   };
 
-  const handleEmail = async () => {
+  const generatePDF = async (): Promise<Blob | null> => {
+    const element = document.getElementById('membership-card-visual');
+    if (!element) return null;
+
+    // Capture visual element exactly as is with high DPI
+    const canvas = await html2canvas(element, {
+      scale: 4, // High Resolution
+      useCORS: true,
+      backgroundColor: null,
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    // ISO ID-1 Standard dimensions
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [85.6, 53.98] 
+    });
+
+    doc.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98);
+    return doc.output('blob');
+  };
+
+  const handleEmail = async (provider: 'default' | 'gmail') => {
     setIsGenerating(true);
     try {
-      const element = document.getElementById('membership-card-visual');
-      if (!element) {
-        alert("No se encuentra el elemento visual del carnet.");
-        setIsGenerating(false);
-        return;
-      }
-
-      // 1. Generate PDF
-      const canvas = await html2canvas(element, {
-        scale: 4,
-        useCORS: true,
-        backgroundColor: null,
-        letterRendering: true,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [85.6, 53.98]
-      });
-
-      doc.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98);
+      // 1. Generate & Download PDF
+      const pdfBlob = await generatePDF();
+      if (!pdfBlob) throw new Error("Error generating PDF");
       
-      // Download the PDF (Browsers cannot attach files to mailto automatically)
-      doc.save(`Carnet_AMPA_${family.membershipNumber}.pdf`);
+      const fileName = `Carnet_AMPA_${family.membershipNumber}.pdf`;
+      (FileSaver as any).saveAs(pdfBlob, fileName);
 
-      // 2. Prepare the Email Body
+      // 2. Prepare Message
       const membersList = family.members
         .map(m => `• ${m.firstName} ${m.lastName} (${m.role})`)
         .join('\n');
@@ -144,23 +149,32 @@ DATOS DEL SOCIO:
 Nº Socio: ${family.membershipNumber}
 Familia: ${family.familyName}
 
-INTEGRANTES INCLUIDOS:
+INTEGRANTES:
 ${membersList}
 
-Por favor, guarde el archivo PDF adjunto (se ha descargado en su dispositivo).
+* IMPORTANTE: Se ha descargado el archivo "${fileName}" en su dispositivo. Por favor, adjúntelo a este correo.
 
 Saludos cordiales,
 AMPA Agustinos Granada`;
 
       // 3. Open Mail Client
       setTimeout(() => {
-          window.location.href = `mailto:${family.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          if (provider === 'gmail') {
+             // Gmail Web Compose URL
+             const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(family.email)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+             window.open(gmailUrl, '_blank');
+          } else {
+             // Standard Mailto
+             window.location.href = `mailto:${family.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          }
+          
+          alert(`✅ Carnet PDF generado y descargado.\n\nSe abrirá su correo. No olvide arrastrar el archivo "${fileName}" que acabamos de descargar.`);
           setIsGenerating(false);
       }, 800);
 
     } catch (error) {
       console.error(error);
-      alert("Error generando el proceso de email.");
+      alert("Error en el proceso.");
       setIsGenerating(false);
     }
   };
@@ -169,23 +183,19 @@ AMPA Agustinos Granada`;
     setIsGenerating(true);
     try {
       const element = document.getElementById('mobile-card-export');
-      if (!element) {
-        alert("No se pudo generar el carnet móvil.");
-        setIsGenerating(false);
-        return;
-      }
+      if (!element) throw new Error("Element not found");
       
       const canvas = await html2canvas(element, {
         scale: 2, 
         useCORS: true,
-        backgroundColor: '#f8fafc'
+        backgroundColor: '#f8fafc',
+        height: element.scrollHeight, // Capture full height including overflow
+        windowHeight: element.scrollHeight
       });
       
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
       if(blob) {
          (FileSaver as any).saveAs(blob, `Carnet_Movil_Socio_${family.membershipNumber}.jpg`);
-      } else {
-        alert("Error al crear el archivo de imagen.");
       }
 
     } catch (error) {
@@ -204,8 +214,7 @@ AMPA Agustinos Granada`;
           <h3 className="text-lg font-bold text-slate-800">Carnet de Socio</h3>
         </div>
 
-        {/* STANDARD CARD (Landscape) - Visual for Print/Email */}
-        {/* Adjusted Font Sizes and Spacing for HTML2Canvas consistency */}
+        {/* VISUAL CARD (Landscape) - SOURCE FOR PDF & PRINT */}
         <div style={{ containerType: 'inline-size' }} className="w-full mb-6">
           <div 
             id="membership-card-visual" 
@@ -241,28 +250,26 @@ AMPA Agustinos Granada`;
                 </div>
               </div>
 
+              {/* Body */}
               <div className="flex flex-col flex-1 justify-center" style={{ gap: '1.2cqw' }}>
                 <div style={{ marginBottom: '0.5cqw' }}>
                    <p className="text-white uppercase tracking-widest font-bold" style={{ fontSize: '1.8cqw', marginBottom: '0.5cqw' }}>Familia</p>
-                   {/* Reduced size slightly to prevent wrapping on long names */}
                    <h2 className="font-bold tracking-tight leading-normal drop-shadow-sm pb-[0.5cqw]" style={{ fontSize: '4.8cqw' }}>{family.familyName}</h2>
                 </div>
                 
                 <div className="flex items-center justify-between" style={{ gap: '1.5cqw' }}>
                    <div className="flex items-center flex-1 min-w-0" style={{ gap: '2cqw' }}>
-                      {/* Membership Number Box */}
+                      {/* Number */}
                       <div className="flex flex-col bg-white/10 backdrop-blur-md border border-white/30 shadow-inner shrink-0 text-center justify-center" style={{ padding: '1cqw 1.5cqw', borderRadius: '1.5cqw', height: '14cqw' }}>
                           <p className="text-white uppercase tracking-widest font-bold" style={{ fontSize: '1.5cqw', marginBottom: '0.5cqw' }}>Nº Socio</p>
-                          {/* Force line-height 1 to fix centering */}
                           <h2 className="font-black tracking-tighter text-white drop-shadow-md flex items-center justify-center" style={{ fontSize: '5cqw', lineHeight: '1', margin: 0 }}>{family.membershipNumber}</h2>
                       </div>
                       
-                      {/* Members List */}
+                      {/* Members */}
                       <div className="flex flex-col min-w-0 border-l border-white/30" style={{ paddingLeft: '2cqw', height: '100%', justifyContent: 'center' }}>
                         <p className="text-white uppercase tracking-widest font-bold" style={{ fontSize: '1.5cqw', marginBottom: '0.8cqw' }}>Integrantes</p>
                         <div className="flex flex-col" style={{ gap: '0.4cqw' }}>
                           {family.members.slice(0, 6).map((m, i) => (
-                            // Reduced font size, removed truncate, changed to bold instead of black for better PDF rendering
                             <div key={i} className="text-white flex items-baseline gap-[0.5cqw] whitespace-nowrap overflow-hidden" style={{ fontSize: '2.7cqw', lineHeight: '1.1' }}>
                                <span className="font-bold">{m.firstName}</span> <span className="font-medium opacity-90">{m.lastName}</span>
                             </div>
@@ -274,8 +281,8 @@ AMPA Agustinos Granada`;
                       </div>
                    </div>
                    
-                   {/* QR Code */}
-                   <div className="bg-white shadow-xl shrink-0 flex items-center justify-center" style={{ padding: '1cqw', borderRadius: '1.5cqw', width: '22cqw', height: '22cqw' }}>
+                   {/* QR */}
+                   <div className="bg-white shadow-xl shrink-0 flex items-center justify-center" style={{ padding: '1cqw', borderRadius: '1.5cqw', width: '23cqw', height: '23cqw' }}>
                         <div style={{ height: "100%", width: "100%" }}>
                           <QRCode 
                             id={`qr-code-${family.id}`}
@@ -300,9 +307,15 @@ AMPA Agustinos Granada`;
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <Button variant="secondary" size="sm" onClick={handlePrint} icon={<Printer size={16}/>}>Imprimir</Button>
-            <Button variant="secondary" size="sm" onClick={handleEmail} icon={<Mail size={16}/>} disabled={isGenerating}>
-                {isGenerating ? 'Generando...' : 'Email PDF'}
-            </Button>
+            
+            <div className="flex flex-col gap-2">
+               <Button variant="secondary" size="sm" onClick={() => handleEmail('default')} icon={<Mail size={16}/>} disabled={isGenerating}>
+                  {isGenerating ? <Loader2 className="animate-spin" size={16}/> : 'Email (App)'}
+               </Button>
+               <Button variant="danger" size="sm" onClick={() => handleEmail('gmail')} icon={<Mail size={16}/>} disabled={isGenerating} className="text-[10px] bg-red-50 text-red-700 border-red-100">
+                  Gmail Web
+               </Button>
+            </div>
           </div>
           
           <Button 
@@ -314,97 +327,74 @@ AMPA Agustinos Granada`;
           >
               Descargar JPG (Móvil)
           </Button>
-          
-          <p className="text-[10px] text-slate-400 text-center mt-2 px-2 leading-tight">
-            * El botón "Email PDF" descargará el archivo y abrirá su gestor de correo para que pueda adjuntarlo.
-          </p>
         </div>
       </div>
 
       {/* 
-        HIDDEN MOBILE CARD FOR EXPORT (VERTICAL DESIGN)
-        Dimensions: 540x960 (9:16 Aspect Ratio)
+        HIDDEN MOBILE CARD EXPORT (Vertical) 
+        UPDATED: Dynamic Height and Grid Layout for Unlimited Members
       */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-        <div id="mobile-card-export" className="w-[540px] h-[960px] bg-slate-50 relative overflow-hidden flex flex-col font-[Montserrat]">
-             
+        <div id="mobile-card-export" className="w-[540px] h-auto bg-slate-50 relative flex flex-col font-[Montserrat] pb-10">
              {/* Header Background */}
              <div className="absolute top-0 left-0 w-full h-[340px] bg-gradient-to-b from-red-700 to-red-600 rounded-b-[50px] shadow-lg z-0"></div>
-             
-             {/* Pattern Overlay */}
              <div className="absolute top-0 left-0 w-full h-[340px] opacity-20 z-0" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
-             <div className="relative z-10 flex flex-col h-full items-center pt-10 px-6 pb-8">
-                 
-                 {/* Top Logo & Title */}
+             <div className="relative z-10 flex flex-col h-full items-center pt-10 px-6">
+                 {/* Branding */}
                  <div className="flex flex-col items-center mb-6 w-full">
                      <div className="bg-white p-3 rounded-2xl shadow-xl mb-4 transform rotate-3">
-                        {/* Fallback visual for Logo */}
                         <div className="w-16 h-16 bg-red-600 rounded-xl flex items-center justify-center text-white font-black text-3xl">AG</div>
                      </div>
                      <h1 className="text-white font-black text-3xl tracking-tight drop-shadow-md">AMPA AGUSTINOS</h1>
                      <p className="text-red-100 font-bold tracking-[0.3em] uppercase text-xs mt-1">Carnet Digital</p>
                  </div>
 
-                 {/* Main Info Card */}
-                 <div className="w-full bg-white rounded-3xl shadow-2xl p-6 border border-slate-100 flex flex-col items-center text-center relative mb-6">
+                 {/* Main Card Info */}
+                 <div className="w-full bg-white rounded-3xl shadow-2xl p-6 border border-slate-100 flex flex-col items-center text-center relative mb-6 shrink-0">
                     <div className="absolute -top-3 bg-yellow-400 text-yellow-900 text-xs font-black uppercase px-4 py-1.5 rounded-full shadow-md tracking-wider">
                        Curso {schoolYear}
                     </div>
-
                     <div className="mt-4 mb-5 w-full">
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Familia Socio</p>
                        <h2 className="text-2xl font-black text-slate-800 leading-tight break-words">{family.familyName}</h2>
                     </div>
-
-                    {/* QR & ID Row */}
                     <div className="flex items-center gap-6 w-full justify-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
                         <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                             <QRCode 
-                               size={120} 
-                               value={qrValidationText} 
-                               level="M" 
-                               fgColor="#000000"
-                               bgColor="#FFFFFF"
-                             />
+                             <QRCode size={120} value={qrValidationText} level="M" fgColor="#000000" bgColor="#FFFFFF"/>
                         </div>
                         <div className="flex flex-col items-start">
                              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Nº de Socio</p>
                              <p className="text-5xl font-black text-red-600 tracking-tighter">#{family.membershipNumber}</p>
-                             <div className="h-1 w-12 bg-red-200 rounded-full mt-2"></div>
                         </div>
                     </div>
                  </div>
 
-                 {/* Members List */}
-                 <div className="w-full flex-1 bg-white rounded-3xl shadow-xl border border-slate-100 p-6 relative overflow-hidden flex flex-col">
+                 {/* Members List - Now Flexible Height & Grid */}
+                 <div className="w-full bg-white rounded-3xl shadow-xl border border-slate-100 p-6 relative flex flex-col">
                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-yellow-400 to-red-500"></div>
-                     
                      <div className="flex items-center gap-2 mb-4 justify-center shrink-0">
-                        <div className="h-px w-8 bg-slate-200"></div>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Integrantes</p>
-                        <div className="h-px w-8 bg-slate-200"></div>
                      </div>
-
-                     <div className="space-y-3 overflow-y-auto pr-1">
+                     
+                     <div className="grid grid-cols-2 gap-3 w-full">
                         {family.members.map((m) => (
-                          <div key={m.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-                               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black shadow-sm shrink-0 ${m.role === Role.CHILD ? 'bg-orange-100 text-orange-600' : 'bg-slate-800 text-white'}`}>
+                          <div key={m.id} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shadow-sm shrink-0 ${m.role === Role.CHILD ? 'bg-orange-100 text-orange-600' : 'bg-slate-800 text-white'}`}>
                                   {m.firstName.charAt(0)}
                                </div>
                                <div className="min-w-0 text-left">
-                                  {/* Allow names to wrap and show fully */}
-                                  <p className="text-sm font-bold text-slate-800 leading-snug">{m.firstName} {m.lastName}</p>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase">{m.role}</p>
+                                  <p className="text-xs font-bold text-slate-800 leading-tight break-words">{m.firstName}</p>
+                                  <p className="text-[10px] text-slate-500 font-bold uppercase break-words">{m.lastName}</p>
                                </div>
                           </div>
                         ))}
                      </div>
                  </div>
 
-                 {/* Footer */}
-                 <div className="mt-6 text-center opacity-60">
-                     <p className="text-[10px] font-bold text-slate-400">AMPA Agustinos Granada</p>
+                 {/* Footer branding */}
+                 <div className="mt-6 opacity-50">
+                    <p className="text-[10px] font-bold text-slate-400">AMPA Agustinos Granada</p>
                  </div>
              </div>
         </div>

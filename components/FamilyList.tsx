@@ -18,7 +18,8 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
   const [filterStatus, setFilterStatus] = useState<'ALL' | FamilyStatus>('ALL');
   const [sortBy, setSortBy] = useState<'name' | 'number'>('name');
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  // Default to 'table' view as requested
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   
   const isAdmin = currentUser.role === AppRole.ADMIN || currentUser.role === AppRole.SUPERADMIN;
 
@@ -745,43 +746,43 @@ export const FamilyList: React.FC<FamilyListProps> = ({ families, currentUser, o
             <table className="w-full text-sm text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
-                  <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Nº Socio</th>
-                  <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Familia</th>
-                  <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Estado</th>
-                  <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs">Contacto</th>
-                  <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-xs text-right">Acciones</th>
+                  <th className="px-6 py-3 font-bold text-slate-500 uppercase tracking-wider text-xs">Nº Socio</th>
+                  <th className="px-6 py-3 font-bold text-slate-500 uppercase tracking-wider text-xs">Familia</th>
+                  <th className="px-6 py-3 font-bold text-slate-500 uppercase tracking-wider text-xs">Estado</th>
+                  <th className="px-6 py-3 font-bold text-slate-500 uppercase tracking-wider text-xs">Contacto</th>
+                  <th className="px-6 py-3 font-bold text-slate-500 uppercase tracking-wider text-xs text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sortedFamilies.map((family) => (
                    <tr key={family.id} className="hover:bg-red-50/30 transition-colors group cursor-pointer" onClick={() => onSelect(family)}>
-                     <td className="px-6 py-4">
+                     <td className="px-6 py-2">
                         <span className="font-mono font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded">#{family.membershipNumber}</span>
                      </td>
-                     <td className="px-6 py-4">
-                        <div className="font-bold text-slate-800 text-base">{family.familyName}</div>
+                     <td className="px-6 py-2">
+                        <div className="font-bold text-slate-800 text-sm">{family.familyName}</div>
                         <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5"><MapPin size={10}/> {family.address}</div>
                      </td>
-                     <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold shadow-sm ${family.status === FamilyStatus.ACTIVE ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                     <td className="px-6 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${family.status === FamilyStatus.ACTIVE ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                            {family.status}
                         </span>
                      </td>
-                     <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-slate-600 font-medium flex items-center gap-1"><Phone size={12} className="text-slate-400"/> {family.phone}</span>
-                          <span className="text-slate-500 text-xs flex items-center gap-1"><Mail size={12} className="text-slate-400"/> {family.email}</span>
+                     <td className="px-6 py-2">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-slate-600 font-medium flex items-center gap-1 text-xs"><Phone size={10} className="text-slate-400"/> {family.phone}</span>
+                          <span className="text-slate-500 text-[10px] flex items-center gap-1"><Mail size={10} className="text-slate-400"/> {family.email}</span>
                         </div>
                      </td>
-                     <td className="px-6 py-4 text-right">
+                     <td className="px-6 py-2 text-right">
                         {/* ONLY SHOW ACTIONS IF ADMIN */}
                         {isAdmin && (
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => { e.stopPropagation(); onEdit(family); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                              <Edit size={16} />
+                            <button onClick={(e) => { e.stopPropagation(); onEdit(family); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                              <Edit size={14} />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onDelete(family.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                              <Trash2 size={16} />
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(family.id); }} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         )}
