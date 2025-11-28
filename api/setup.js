@@ -2,6 +2,20 @@
 const { sql } = require('@vercel/postgres');
 
 // Visit /api/setup to initialize the database
+//______________NUEVO_________________
+// Define database connection via the `DATABASE_URL` env var
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Define custom output path for generated Prisma Client
+generator client {
+  provider = "prisma-client-js"
+  output   = "/app/generated/prisma-client"
+}
+
+//___NUEVO____________________________
 module.exports = async (req, res) => {
   try {
     // Create Families Table (JSONB storage for flexibility)
