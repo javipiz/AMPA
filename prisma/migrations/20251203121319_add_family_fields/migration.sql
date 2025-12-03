@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Family" ADD COLUMN "createdAt" DATETIME DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "Family" ADD COLUMN "createdBy" TEXT;
+ALTER TABLE "Family" ADD COLUMN "membershipNumber" TEXT;
+ALTER TABLE "Family" ADD COLUMN "status" TEXT;

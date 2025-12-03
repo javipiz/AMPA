@@ -1,0 +1,40 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Family {
+  id               Int      @id @default(autoincrement())
+  membershipNumber String?
+  familyName       String
+  address          String
+  phone            String
+  email            String
+  joinDate         String
+  status           String
+  aiSummary        String?
+  createdAt        DateTime @default(now())
+  createdBy        String?
+  updatedAt        DateTime @updatedAt
+
+  members          Member[]
+}
+
+model Member {
+  id         Int     @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  birthDate  String
+  role       String
+  gender     String?
+  notes      String?
+  email      String?
+  phone      String?
+
+  familyId   Int
+  family     Family @relation(fields: [familyId], references: [id])
+}
