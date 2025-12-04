@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "postinstall": "prisma generate"
+  "dev": "vite",
+  "build": "prisma generate && vite build",
+  "postinstall": "prisma generate",
+  "preview": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
