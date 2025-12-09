@@ -1,21 +1,16 @@
+
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken } from "@/lib/auth";
+import { getServerSession } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("session")?.value;
+  const session = await getServerSession(req);
 
-  if (!token) {
-    return NextResponse.json({ authenticated: false });
-  }
-
-  const payload = await verifySessionToken(token);
-
-  if (!payload) {
+  if (!session) {
     return NextResponse.json({ authenticated: false });
   }
 
   return NextResponse.json({
     authenticated: true,
-    user: payload
+    user: session.user
   });
 }
