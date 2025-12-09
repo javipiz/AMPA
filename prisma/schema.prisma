@@ -1,0 +1,73 @@
+// -------------------------------
+// DATASOURCE / GENERATOR
+// -------------------------------
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------
+// MODELS
+// -------------------------------
+
+// 👤 Usuario del sistema
+model User {
+  id        Int       @id @default(autoincrement())
+  username  String    @unique
+  name      String
+  role      String     // SUPERADMIN | ADMIN | USER
+  password  String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sessions  Session[]
+}
+
+// 🔑 Sesión del usuario (para login persistente)
+model Session {
+  token     String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// 👪 Familia
+model Family {
+  id               Int      @id @default(autoincrement())
+  membershipNumber String?  @unique
+  familyName       String
+  address          String
+  phone            String
+  email            String
+  joinDate         String
+  status           String   // "Activo" | "Baja"
+
+  aiSummary String?
+  createdBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   Member[]
+}
+
+// 👧🧒 Miembros de familia
+model Member {
+  id        Int    @id @default(autoincrement())
+  firstName String
+  lastName  String
+  birthDate String
+  role      String
+  gender    String?
+  notes     String?
+  email     String?
+  phone     String?
+
+  familyId  Int
+  family    Family @relation(fields: [familyId], references: [id])
+}
